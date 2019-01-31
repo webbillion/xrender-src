@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <canvas id="canvas"></canvas>
+    <canvas id="canvas" width="300" height="300"></canvas>
   </div>
 </template>
 
@@ -11,13 +11,20 @@ import * as xrender from '../xrender'
 
 @Component({
   mounted () {
-    let xr = xrender.init('#app')
+    let xr = xrender.init('#canvas', {
+      height: 300,
+      width: 400
+    })
     let circle = new xrender.Circle({
       shape: {
         cx: 40,
         cy: 40,
         r: 20
-      }
+      },
+      style: {
+        fill: '#000'
+      },
+      zLevel: 2
     })
     let circle1 = new xrender.Circle({
       shape: {
@@ -26,18 +33,19 @@ import * as xrender from '../xrender'
         r: 20
       },
       style: {
-        fill: '#00f'
+        stroke: '#f00',
+        lineWidth: 1
       }
     })
     let circle2 = new xrender.Circle({
       shape: {
-        cx: 100,
-        cy: 100,
+        cx: 150,
+        cy: 150,
         r: 40
       },
       style: {
-        fill: '#0ff',
-        stroke: '#f00'
+        stroke: '#f00',
+        opacity: 0.5
       }
     })
     xr.add(circle, circle1, circle2)
@@ -53,6 +61,7 @@ import * as xrender from '../xrender'
       }
     })
     xr.add(rect)
+    window.circle = circle
   }
 })
 export default class App extends Vue {}
@@ -66,5 +75,9 @@ export default class App extends Vue {}
   text-align: center;
   color: #2c3e50;
   margin-top: 60px;
+}
+#canvas {
+  width: 300px;
+  height: 300px;
 }
 </style>

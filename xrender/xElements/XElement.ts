@@ -1,4 +1,5 @@
-import { updateObjValue } from '../util'
+import XRender from '../XRender'
+import { isString, isObject, updateObjValue } from '../util'
 /**
  * 目前什么都没有
  */
@@ -18,6 +19,8 @@ export interface XElementStyle {
    * 描边
    */
   stroke?: Color
+  opacity?: number
+  lineWidth?: number
 }
 /**
  * 元素选项接口
@@ -35,14 +38,47 @@ export interface XElementOptions {
    * 样式
    */
   style?: XElementStyle
+  /**
+   * 元素所处层级
+   */
+  zLevel?: number
+}
+/**
+ * 将指定样式绑定到上下文中
+ */
+function bindStyle (ctx: CanvasRenderingContext2D, style: XElementStyle) {
+  let fill = style.fill || 'transparent'
+  ctx.fillStyle = fill
+  ctx.strokeStyle = style.stroke
+  ctx.globalAlpha = style.opacity
+  ctx.lineWidth = style.lineWidth
 }
 
 class XElement {
   name = 'xelement'
   shape: XElementShape = {}
   style: XElementStyle = {}
+  zLevel = 1
   options: XElementOptions
-  constructor (opt: XElementOptions) {
+  _xr: XRender
+  /**
+   * 为真的话绘制时会忽略此元素
+   */
+  ignored: boolean
+  /**
+   * 到后面会发现，对不同的属性，需要有不同的设置方法
+  */
+  attrFunctions = {
+    shape: (newShape: Object) => {
+      let shape = this.options.shape
+      updateObjValue(shape, newShape)
+    },
+    style: (newStyle) => {
+      let style = this.options.style
+      updateObjValue(style, newStyle)
+    }
+  }
+  constructor (opt: XElementOptions = {}) {
     this.options = opt
   }
   /**
@@ -56,6 +92,9 @@ class XElement {
     if (opt.style) {
       updateObjValue(this.style, opt.style)
     }
+    if (opt.zLevel) {
+      this.zLevel = opt.zLevel
+    }
   }
   /**
    * 绘制
@@ -67,11 +106,8 @@ class XElement {
    * 绘制之前进行样式的处理
    */
   beforeRender (ctx: CanvasRenderingContext2D) {
-    this.updateOptions()
-    let style = this.style
     ctx.save()
-    ctx.fillStyle = style.fill
-    ctx.strokeStyle = style.stroke
+    bindStyle(ctx, this.style)
     ctx.beginPath()
   }
   /**
@@ -89,6 +125,53 @@ class XElement {
     this.beforeRender(ctx)
     this.render(ctx)
     this.afterRender(ctx)
+  }
+  /**
+   * 设置元素相关的`xr`
+   */
+  setXr (xr: XRender) {
+    this._xr = xr
+  }
+  /**
+   * 实际设置属性的方法
+   */
+  attrKv (key: string, value: any) {
+    let updateMethod = this.attrFunctions[key]
+    if (updateMethod) {
+      updateMethod(value)
+    } else {
+      this.options[key] = value
+    }
+  }
+  /**
+   * 更新属性并重绘
+   */
+  attr (key: String | Object, value?: any) {
+    if (isString(key)) {
+      this.attrKv(key as string, value)
+    } else if (isObject(key)) {
+      for (let name in key) {
+        if (key.hasOwnProperty(name)) {
+          this.attrKv(name, key[name])
+        }
+      }
+    }
+    this.updateOptions()
+    this._xr.render()
+  }
+  /**
+   * 显示元素
+   */
+  show () {
+    this.ignored = false
+    this._xr.render()
+  }
+  /**
+   * 隐藏元素
+   */
+  hide () {
+    this.ignored = true
+    this._xr.render()
   }
 }
 

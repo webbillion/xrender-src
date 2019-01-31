@@ -26,6 +26,7 @@ class Rect extends XElement {
   }
   constructor (opt: RectOptions) {
     super(opt)
+    this.updateOptions()
   }
   render (ctx: CanvasRenderingContext2D) {
     let shape = this.shape

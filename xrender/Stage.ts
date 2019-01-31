@@ -28,7 +28,14 @@ class Stage {
    * 获取所有元素
    */
   getAll () {
-    return this.xelements
+    this.updateXElements()
+    return this.xelements.filter(xel => !xel.ignored)
+  }
+  updateXElements () {
+    // zLevel高的在后，其它按加入次序排列
+    this.xelements.sort((a, b) => {
+      return a.zLevel - b.zLevel
+    })
   }
 }
 

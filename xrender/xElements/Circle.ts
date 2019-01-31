@@ -27,6 +27,7 @@ class Circle extends XElement {
   }
   constructor (opt: CircleOptions) {
     super(opt)
+    this.updateOptions()
   }
   render (ctx: CanvasRenderingContext2D) {
     let shape = this.shape
