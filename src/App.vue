@@ -1,18 +1,59 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js + TypeScript App"/>
+    <canvas id="canvas"></canvas>
   </div>
 </template>
 
 <script lang="ts">
-import { Component, Vue } from 'vue-property-decorator';
-import HelloWorld from './components/HelloWorld.vue';
+import { Component, Vue } from 'vue-property-decorator'
+
+import * as xrender from '../xrender'
 
 @Component({
-  components: {
-    HelloWorld,
-  },
+  mounted () {
+    let xr = xrender.init('#app')
+    let circle = new xrender.Circle({
+      shape: {
+        cx: 40,
+        cy: 40,
+        r: 20
+      }
+    })
+    let circle1 = new xrender.Circle({
+      shape: {
+        cx: 60,
+        cy: 60,
+        r: 20
+      },
+      style: {
+        fill: '#00f'
+      }
+    })
+    let circle2 = new xrender.Circle({
+      shape: {
+        cx: 100,
+        cy: 100,
+        r: 40
+      },
+      style: {
+        fill: '#0ff',
+        stroke: '#f00'
+      }
+    })
+    xr.add(circle, circle1, circle2)
+    let rect = new xrender.Rect({
+      shape: {
+        x: 120,
+        y: 120,
+        width: 40,
+        height: 40
+      },
+      style: {
+        fill: 'transparent'
+      }
+    })
+    xr.add(rect)
+  }
 })
 export default class App extends Vue {}
 </script>
