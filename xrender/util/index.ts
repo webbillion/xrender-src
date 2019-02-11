@@ -16,7 +16,7 @@ export function isObject (value: any) {
   return typeof value === 'object'
 }
 
-export function updateObjValue (obj: Object, newObj: Object) {
+export function merge (obj: Object, newObj: Object) {
   for (let key in newObj) {
     obj[key] = newObj[key]
   }

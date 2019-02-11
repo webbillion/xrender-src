@@ -1,5 +1,5 @@
 import XRender from '../XRender'
-import { isString, isObject, updateObjValue } from '../util'
+import { isString, isObject, merge } from '../util'
 /**
  * 目前什么都没有
  */
@@ -71,11 +71,11 @@ class XElement {
   attrFunctions = {
     shape: (newShape: Object) => {
       let shape = this.options.shape
-      updateObjValue(shape, newShape)
+      merge(shape, newShape)
     },
     style: (newStyle) => {
       let style = this.options.style
-      updateObjValue(style, newStyle)
+      merge(style, newStyle)
     }
   }
   constructor (opt: XElementOptions = {}) {
@@ -87,10 +87,10 @@ class XElement {
   updateOptions () {
     let opt = this.options
     if (opt.shape) {
-      updateObjValue(this.shape, opt.shape)
+      merge(this.shape, opt.shape)
     }
     if (opt.style) {
-      updateObjValue(this.style, opt.style)
+      merge(this.style, opt.style)
     }
     if (opt.zLevel) {
       this.zLevel = opt.zLevel
