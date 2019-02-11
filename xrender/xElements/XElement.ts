@@ -1,4 +1,4 @@
-import { updateObjValue } from '../util'
+import { merge } from '../util'
 /**
  * 目前什么都没有
  */
@@ -51,10 +51,10 @@ class XElement {
   updateOptions () {
     let opt = this.options
     if (opt.shape) {
-      updateObjValue(this.shape, opt.shape)
+      merge(this.shape, opt.shape)
     }
     if (opt.style) {
-      updateObjValue(this.style, opt.style)
+      merge(this.style, opt.style)
     }
   }
   /**
