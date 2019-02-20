@@ -7,6 +7,7 @@ export { default as Image } from './xElements/Image'
 export { default as Arc } from './xElements/Arc'
 export { default as Line } from './xElements/Line'
 export { default as BezierCurve } from './xElements/BezierCurve'
+export { default as Text } from './xElements/Text'
 // 只暴露方法而不直接暴露`XRender`类
 export function init (dom: string | HTMLElement, opt?: XRenderOptions) {
   return new XRedner(dom, opt)

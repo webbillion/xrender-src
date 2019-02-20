@@ -85,6 +85,12 @@ function convertCoordinates (e: MouseEvent, dom: HTMLElement) {
     y: e.clientY - rect.top,
     rawEvent: e
   }
+  if (xrEvent.x < 0) {
+    xrEvent.x = 0
+  }
+  if (xrEvent.y < 0) {
+    xrEvent.y = 0
+  }
 
   return xrEvent
 }

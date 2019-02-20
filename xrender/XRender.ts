@@ -25,7 +25,7 @@ class XRender implements Eventful {
   domHandler: DomHandler
   constructor (dom: string | HTMLElement, opt: XRenderOptions = {}) {
     extendsClass(this, Eventful)
-    let stage = new Stage()
+    let stage = new Stage(this)
     this.stage = stage
     this.painter = new Painter(dom, stage, opt)
     this.initDomHandler()
@@ -39,6 +39,9 @@ class XRender implements Eventful {
       this.stage.add(xel)
     }
     this.render()
+  }
+  delete (xel: XElement) {
+    this.stage.delete(xel)
   }
   render () {
     this.painter.render()
@@ -77,6 +80,16 @@ class XRender implements Eventful {
    */
   setCursor (cursor = 'pointer') {
     this.painter.layerContainer.style.cursor = cursor
+  }
+  dispose () {
+    this.stage.dispose()
+    this.domHandler.dispose()
+    this.painter.dispose()
+
+    this.stage =
+    this.domHandler =
+    this.painter =
+    this._handlers = null
   }
 }
 

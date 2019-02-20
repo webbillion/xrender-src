@@ -40,6 +40,9 @@ class Painter {
    */
   drawId: number
   render = debounce(() => {
+    if (!this.stage) {
+      return
+    }
     this.beforeRender()
     let xelements = this.stage.getAll()
     this.updateLayerList(xelements)
@@ -90,6 +93,13 @@ class Painter {
     for (let i = 0; i < xelList.length; i += 1) {
       let xel = xelList[i]
       let layer = layerList[xel.zIndex] || this.createLayer(xel.zIndex)
+      if (xel.deleteing) {
+        layer._dirty = true
+        xel.removeSelf()
+        xelList.splice(i, 1)
+        i -= 1
+        continue
+      }
       // 到下一个层级了
       if (preLayer !== layer) {
         layer.startIndex = i
@@ -136,6 +146,9 @@ class Painter {
     }
   }
   painList (xelements: XElement[], drawId: number) {
+    if (!this.stage) {
+      return
+    }
     if (drawId !== this.drawId) {
       return
     }
@@ -169,6 +182,14 @@ class Painter {
       }
       layer._dirty = false
     })
+  }
+  dispose () {
+    this.eachLayer(layer => layer.dispose())
+    this.root.innerHTML = ''
+    this.root =
+    this.stage =
+    this.layerContainer =
+    this.layerListMap = null
   }
 }
 

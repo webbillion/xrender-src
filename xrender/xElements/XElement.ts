@@ -1,5 +1,5 @@
 import XRender from '../XRender'
-import { isString, isObject, merge, isFunction, inherit, extendsClass, clone } from '../util'
+import { isString, isObject, merge, isFunction, inherit, extendsClass, clone, getAnimationTarget } from '../util'
 import Animation from '../Animation'
 import { EasingFnType } from '../Easing'
 import Group from './Group'
@@ -34,6 +34,20 @@ export interface XElementStyle {
    * 鼠标样式
    */
   cursor?: string
+  /**
+   * 字体大小
+   */
+  fontSize?: number
+  /**
+   * 字体种类
+   */
+  fontFamily?: string
+  shadowBlur?: number
+  shadowColor?: Color
+  shadowOffsetX?: number
+  shadowOffsetY?: number
+  textBaseline?: string
+  textAlign?: string
 }
 /**
  * 元素选项接口
@@ -79,8 +93,9 @@ export interface XElementOptions extends Transform {
 /**
  * 将指定样式绑定到上下文中
  */
-function bindStyle (ctx: CanvasRenderingContext2D, style: XElementStyle) {
+export function bindStyle (ctx: CanvasRenderingContext2D, style: XElementStyle) {
   let fill = style.fill || 'transparent'
+  
   if (style.fill !== ctx.fillStyle) {
     ctx.fillStyle = fill
   }
@@ -93,6 +108,28 @@ function bindStyle (ctx: CanvasRenderingContext2D, style: XElementStyle) {
   if (style.lineWidth !== ctx.lineWidth) {
     ctx.lineWidth = style.lineWidth
   }
+  let font = `${style.fontSize}px ${style.fontFamily}`
+  ctx.font = font;
+  ['lineWidth', 'shadowBlur', 'shadowColor', 'shadowOffsetX', 'shadowOffsetY'].forEach(prop => {
+    if (style[prop] !== ctx[prop]) {
+      ctx[prop] = style[prop]
+    }
+  })
+  let textBaseline = style.textBaseline
+  if (['top', 'middle', 'bottom'].indexOf(textBaseline) === -1) {
+    // 默认为顶部
+    textBaseline = 'top'
+    // 要更新style里的值
+    style.textBaseline = textBaseline
+  }
+  ctx.textBaseline = 'top'
+  let textAlign = style.textAlign
+  if (['left', 'center', 'right'].indexOf(textAlign) === -1) {
+    // 默认为左侧
+    textAlign = 'left'
+    style.textAlign = style.textAlign
+  }
+  ctx.textAlign = 'left'
 }
 export interface Transform {
   /**
@@ -136,7 +173,11 @@ class XElement implements Transform, Eventful {
     stroke: 'none',
     lineWidth: 1,
     opacity: 1,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    fontSize: 12,
+    fontFamily: 'serif',
+    textAlign: 'left',
+    textBaseline: 'top'
   }
   zLevel = 1
   options: XElementOptions
@@ -156,7 +197,14 @@ class XElement implements Transform, Eventful {
    * 元素是否为脏，如果是，重绘时会更新元素所在层，脏检查，这是常用的名词，虽然我不太懂
    */
   _dirty = true
+  /**
+   * 组元素才有
+   */
   stage: Stage
+  /**
+   * 自身所关联的stage
+   */
+  __stage: Stage
   /**
    * 路径代理
    */
@@ -165,6 +213,14 @@ class XElement implements Transform, Eventful {
    * 鼠标是否悬浮在元素上
    */
   hover: boolean
+  /**
+   * 用于裁剪的元素，只能通过`setClip`设置
+   */
+  clip: XElement
+  /**
+   * 是否被用于裁剪，如果是的话，不会进行描边和填充
+   */
+  isClip: boolean
   /**
    * 到后面会发现，对不同的属性，需要有不同的设置方法
   */
@@ -191,6 +247,11 @@ class XElement implements Transform, Eventful {
    * 是否开启可拖曳
    */
   dragable = false
+  /**
+   * 是否正在被删除，`Layer`遇到此标记等同于`drity`，然后调用删除自身的方法
+   * 而`Stage`删除元素时此标记为真会将此元素删除，否则标记为真，然后调用`dirty()`
+   */
+  deleteing = false
   constructor (opt: XElementOptions = {}) {
     extendsClass(this, Eventful)
     this.path = new Path()
@@ -224,6 +285,12 @@ class XElement implements Transform, Eventful {
     ['zLevel', 'relativeGroup', 'zIndex', 'renderByFrame'].forEach(key => {
       if (opt[key] !== undefined) {
         this[key] = opt[key]
+        // 设置`clip`的相对定位元素
+        if (key === 'relativeGroup') {
+          this.clip && this.clip.attr({
+            relativeGroup: opt[key]
+          })
+        }
       }
     })
   }
@@ -260,6 +327,9 @@ class XElement implements Transform, Eventful {
    * 绘制之前进行样式的处理
    */
   beforeRender (ctx: CanvasRenderingContext2D) {
+    // 需要注意的是，裁剪路径有自己的`transform`体系，为了让裁剪路径和元素本身有相同的相对变换，需要在`setClip`中设置parent
+    ctx.save()
+    this.setCtxClip(ctx)
     this.handleParentBeforeRender(ctx)
     ctx.save()
     bindStyle(ctx, this.style)
@@ -291,14 +361,16 @@ class XElement implements Transform, Eventful {
    * 绘制之后进行还原
    */
   afterRender (ctx: CanvasRenderingContext2D) {
-    if (this.hasFill()) {
+    if (this.hasFill() && !this.isClip) {
       ctx.fill()
     }
-    if (this.hasStroke()) {
+    if (this.hasStroke() && !this.isClip) {
       ctx.stroke()
     }
     ctx.restore()
     this.handleParentAfterRender(ctx)
+    // 在最后，重置裁剪
+    ctx.restore()
   }
   /**
    * 刷新，这个方法由外部调用
@@ -383,21 +455,9 @@ class XElement implements Transform, Eventful {
     } else if (!time) {
       time = 500
     }
-    // 先停止动画
+    // 先停止动画e
     this.animation && this.animation.stop()
-    let animateProps = [
-      'shape',
-      'style',
-      'position',
-      'scale',
-      'origin',
-      'rotation'
-    ]
-    let animteTarget = {}
-    animateProps.forEach(prop => {
-      animteTarget[prop] = this[prop]
-    })
-    this.animation = new Animation(animteTarget)
+    this.animation = new Animation(getAnimationTarget(this, target))
     return this.animation
       .during((target) => {
         this.attr(target)
@@ -410,6 +470,22 @@ class XElement implements Transform, Eventful {
   /**
    * 设置变换
    */
+  // setTransform (ctx: CanvasRenderingContext2D) {
+  //   this.setRelativeTransform(ctx)
+  //   if (!this.selfNeedTransform) {
+  //     return
+  //   }
+  //   // 首先变换中心点
+  //   ctx.translate(this.origin[0], this.origin[1])
+  //   // 应用缩放
+  //   ctx.scale(this.scale[0], this.scale[1])
+  //   // 应用旋转
+  //   ctx.rotate(this.rotation)
+  //   // 恢复
+  //   ctx.translate(-this.origin[0] / this.scale[0], -this.origin[1] / this.scale[1])
+  //   // 平移
+  //   ctx.translate(this.position[0] / this.scale[0], this.position[1] / this.scale[1])
+  // }
   setTransform (ctx: CanvasRenderingContext2D) {
     this.setRelativeTransform(ctx)
     if (!this.selfNeedTransform) {
@@ -425,6 +501,7 @@ class XElement implements Transform, Eventful {
     ctx.rotate(this.rotation)
     // 恢复
     ctx.translate(-this.origin[0] / this.scale[0], -this.origin[1] / this.scale[1])
+    
   }
   /**
    * 设置相对元素的变换
@@ -453,6 +530,10 @@ class XElement implements Transform, Eventful {
     this.setXr(parent._xr)
     // 更新配置
     this.updateOptions()
+    // 更新裁剪路径的父元素
+    if (this.clip) {
+      this.setClip(this.clip)
+    }
   }
   /**
    * 在渲染之前对父元素进行处理
@@ -486,6 +567,11 @@ class XElement implements Transform, Eventful {
    * 是否包含某个点
    */
   contain (x: number, y: number) {
+    if (this.clip) {
+      if (!this.clip.contain(x, y)) {
+        return
+      }
+    }
     let local = this.getLocalCord(x, y)
     x = local[0]
     y = local[1]
@@ -553,7 +639,8 @@ class XElement implements Transform, Eventful {
     let draging = false
     if (this)
     this.on('mousedown', e => {
-      if (!this.dragable || (this !== e.target)) {
+      // 冒泡的时候子元素没有设置`dragable`才移动
+      if (!this.dragable || (this !== e.target && e.target.dragable)) {
         return
       }
       draging = true
@@ -562,32 +649,75 @@ class XElement implements Transform, Eventful {
       this._xr.setCursor('move')
     })
     this.on('mousemove', e => {
-      if (!draging || !this.dragable || (this !== e.target)) {
+      if (!draging || !this.dragable || (this !== e.target && e.target.dragable)) {
         return
       }
       let xDiff = e.x - lastX
       let yDiff = e.y - lastY
-      let xel = e.target
-      xel.attr({
-        position: [xel.position[0] += xDiff, xel.position[1] += yDiff]
+      this.attr({
+        position: [this.position[0] += xDiff, this.position[1] += yDiff]
       })
       lastX = e.x
       lastY = e.y
     })
     this.on('mouseup', e => {
-      if (!this.dragable  || (this !== e.target)) {
+      if (!this.dragable  || (this !== e.target && e.target.dragable)) {
         return
       }
       draging = false
       this._xr.setCursor(this.style.cursor)
     })
     this.on('mouseleave', e => {
-      if (!this.dragable  || (this !== e.target)) {
+      if (!this.dragable  || (this !== e.target  && e.target.dragable)) {
         return
       }
       this._xr.setCursor('default')
       draging = false
     })
+  }
+  /**
+   * 设置裁剪路径
+   */
+  setClip (xel: XElement) {
+    this.clip = xel
+    // 为了能应用变换
+    if (this.parent) {
+      // 但又不被`getAll`所获取
+      xel.ignored = true
+      xel.setParent(this.parent)
+      xel.options.relativeGroup = this.relativeGroup
+      // 否则会不断循环
+      xel._xr = null
+    }
+    this.dirty()
+  }
+  /**
+   * 移除裁剪路径
+   */
+  removeClip () {
+    this.clip.ignored = false
+    this.clip = null
+    this.dirty()
+  }
+  /**
+   * 为上下文设定裁剪路径
+   */
+  setCtxClip (ctx: CanvasRenderingContext2D) {
+    if (this.clip) {
+      this.clip.isClip = true
+      this.clip.refresh(ctx)
+      this.clip.isClip = false
+      ctx.clip()
+    }
+  }
+  dispose () {
+    if (this.animation) {
+      this.animation.stop()
+      this.animation.clear()
+    }
+  }
+  removeSelf () {
+    this.__stage.delete(this)
   }
 }
 inherit(XElement, Eventful, ['dispatch'])
@@ -615,7 +745,6 @@ export function getTransformCord(x, y, transform: Transform) {
 
   return [x, y]
 }
-
 
 export default XElement
       

@@ -71,8 +71,9 @@ class Group extends XElement {
    * 对于组，进行额外的变换使子元素能相对它定位
    */
   setTransform (ctx: CanvasRenderingContext2D) {
-    super.setTransform(ctx)
     ctx.translate(this.shape.x, this.shape.y)
+    super.setTransform(ctx)
+    
   }
   /**
    * 重置变换，为`setTransform`的逆过程，通常由子孙元素调用
@@ -113,6 +114,10 @@ class Group extends XElement {
     }
     this._rect = rect
     return rect
+  }
+  dispose () {
+    super.dispose()
+    this.stage.dispose()
   }
 }
 

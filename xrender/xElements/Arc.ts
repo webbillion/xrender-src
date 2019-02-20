@@ -46,13 +46,7 @@ class Arc extends XElement {
   }
   render (ctx: CanvasRenderingContext2D) {
     let shape = this.shape
-
-    ctx.moveTo(10, 10)
-    // ctx.moveTo(100, 100)
-    ctx.arc(shape.cx, shape.cy, shape.r * 2, shape.startAngle, shape.endAngle, !shape.clockwise)
-    // ctx.moveTo(100, 100)
     ctx.arc(shape.cx, shape.cy, shape.r, shape.startAngle, shape.endAngle, !shape.clockwise)
-    // ctx.closePath()
   }
 }
 

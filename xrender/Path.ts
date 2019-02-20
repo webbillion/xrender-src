@@ -58,10 +58,10 @@ class Path {
    * 添加数据
    */
   addData (type: PathType, ...params) {
-    this.data[this.data.length] = {
+    this.data.push({
       type,
       params
-    }
+    })
   }
   // 以下方法调用ctx对应方法即可
   // 约定ctx已经存在
@@ -110,6 +110,15 @@ class Path {
       this._ctx.drawImage(img, dx, dy, dw, dh, sx, sy, sw, sh)
       this.addData(PathType.drawImage, sx, sy, sw, sh)
     }
+  }
+  fillText (text: string, x: number, y: number, maxWidth?: number) {
+    this._ctx.fillText(text, x, y, maxWidth)
+  }
+  strokeText (text: string, x: number, y: number, maxWidth?: number) {
+    this._ctx.strokeText(text, x, y, maxWidth)
+  }
+  measureText (text: string) {
+    return this._ctx.measureText(text)
   }
   /**
    * 当前路径是否包含某个点
@@ -278,7 +287,9 @@ class Path {
       union()
     }
 
-    return rect || new BoundingRect(0, 0, 0, 0)
+    rect = rect || new BoundingRect(0, 0, 0, 0)
+
+    return rect
   }
 }
 

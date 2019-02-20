@@ -105,3 +105,18 @@ export function extendsClass (context, Parents, args = []) {
     }
   })
 }
+/**
+ * 从原始属性中提取要使用动画的属性，返回一个新对象，否则可能对原来的opt造成污染
+ */
+export function getAnimationTarget (origin: Object, target: Object) {
+  const animationTarget = {}
+  for (let key in target) {
+    if (isObject(target[key]) && isObject(origin[key])) {
+      animationTarget[key] = getAnimationTarget(origin[key], target[key])
+    } else {
+      animationTarget[key] = origin[key]
+    }
+  }
+
+  return animationTarget
+}
