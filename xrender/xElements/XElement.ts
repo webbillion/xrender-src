@@ -97,11 +97,6 @@ class XElement {
     if (opt.zLevel) {
       this.zLevel = opt.zLevel
     }
-    // TODO: 要不要拷贝这个对象呢
-    this.animation = new Animation({
-      shape: this.shape,
-      style: this.style
-    })
   }
   /**
    * 绘制
@@ -208,9 +203,11 @@ class XElement {
       time = 500
     }
     // 先停止动画
-    this.animation.stop()
-    // 清除动画队列，查看源码了解详情
-    this.animation.clear()
+    this.animation && this.animation.stop()
+    this.animation = new Animation({
+      shape: this.shape,
+      style: this.style
+    })
 
     return this.animation
       .during((target) => {
