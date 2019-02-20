@@ -1,6 +1,7 @@
 import XElement, { XElementShape, XElementOptions } from './XElement'
 import Stage from '../Stage'
 import XRender from '../XRender'
+import BoundingRect from '../BoundingRect'
 
 interface GroupShape extends XElementShape {
   /**
@@ -30,13 +31,14 @@ class Group extends XElement {
   constructor (opt: GroupOptions = {}) {
     super(opt)
     this.updateOptions()
+    this.style.cursor = 'default'
     this.stage = new Stage()
   }
   render (ctx: CanvasRenderingContext2D) {
-    let list = this.stage.getAll()
-    list.forEach(xel => {
-        xel.refresh(ctx)
-    })
+  }
+  beforeRender (ctx: CanvasRenderingContext2D) {
+    ctx.save()
+    this.setTransform(ctx)
   }
   afterRender (ctx: CanvasRenderingContext2D) {
     ctx.restore()
@@ -80,12 +82,37 @@ class Group extends XElement {
     if (!this.selfNeedTransform) {
       return
     }
-    ctx.translate(-this.shape.x, -this.shape.y)
-    ctx.translate(-this.position[0], -this.position[1])
     ctx.translate(this.origin[0], this.origin[1])
     ctx.rotate(1 / this.rotation)
     ctx.scale(1 / this.scale[0], 1 / this.scale[1])
     ctx.translate(-this.origin[0], -this.origin[1])
+    ctx.translate(-this.shape.x, -this.shape.y)
+    ctx.translate(-this.position[0], -this.position[1])
+  }
+  dirty () {
+    let children = this.stage.xelements
+    for (let i = 0; i < children.length; i += 1) {
+      children[i].dirty()
+    }
+  }
+  contain (x: number, y: number) {
+    let local = this.getLocalCord(x, y)
+    x = local[0]
+    y = local[1]
+
+    return this.getBoundingRect().contain(x, y)
+  }
+  getBoundingRect () {
+    let children = this.stage.getAll()
+    // TODO: 缓存结果
+    let rect = new BoundingRect(0, 0, 0, 0)
+    let child: XElement
+    for (let i = 0; i < children.length; i += 1) {
+      child = children[i]
+      rect.union(child.getBoundingRect().applyTransform(child))
+    }
+    this._rect = rect
+    return rect
   }
 }
 

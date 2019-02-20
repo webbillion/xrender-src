@@ -33,11 +33,16 @@ class Stage {
     return xelements
   }
   updateXElements (callback?: (xel: XElement) => void) {
-    // zIndex高的在前
+    // zIndex高的在后
     // zLevel高的在后，其它按加入次序排列
+    // 即，最上层的就在最后面，方便事件检测时能倒序遍历
+    // 将group排在最前面
     return this.expandXElements(callback).sort((a, b) => {
-      let zIndex = b.zIndex - a.zIndex
-      return  zIndex === 0 ? a.zLevel - b.zLevel : zIndex
+      let isGroup = a.name === 'group'
+      let zIndex = a.zIndex - b.zIndex
+      return !isGroup
+             ? zIndex === 0 ? a.zLevel - b.zLevel : zIndex
+             : -1 
     })
   }
   /**
@@ -52,6 +57,8 @@ class Stage {
       if (xel.stage) {
         // 已经经过筛选了
         let children = xel.stage.getAll(callback)
+        // 将自身也加入，为了能够触发事件
+        children.push(xel)
         for (let i = 0, j = list.length; i < children.length; i += 1, j += 1) {
           list[j] = children[i]
         }

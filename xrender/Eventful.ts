@@ -11,7 +11,7 @@ class Eventful {
    */
   on (event: string, handler: Function) {
     let handlers = this._handlers
-    if (!handler[event]) {
+    if (!handlers[event]) {
       handlers[event] = [handler]
     } else {
       if (handlers[event].indexOf(handler) > -1) {
@@ -19,6 +19,7 @@ class Eventful {
       }
       handlers[event].push(handler)
     }
+    
   }
   /**
    * 取消监听
@@ -44,7 +45,7 @@ class Eventful {
   /**
    * 触发回调
    */
-  dispatch (event: string, params: any) {
+  dispatch (event: string, params?: any) {
     let handlers = this._handlers[event]
     if (!handlers) {
       return

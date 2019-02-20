@@ -33,7 +33,7 @@ interface ImageOptions extends XElementOptions {
 }
 
 class Image extends XElement {
-  name ='rect'
+  name = 'image'
   shape: ImageShape = {
     x: 0,
     y: 0,

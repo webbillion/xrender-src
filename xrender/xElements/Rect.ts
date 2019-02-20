@@ -17,7 +17,7 @@ interface RectOptions extends XElementOptions {
 }
 
 class Rect extends XElement {
-  name ='rect'
+  name = 'rect'
   shape: RectShape = {
     x: 0,
     y: 0,

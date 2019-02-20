@@ -1,9 +1,14 @@
 import XRender from '../XRender'
-import { isString, isObject, merge, isFunction } from '../util'
+import { isString, isObject, merge, isFunction, inherit, extendsClass, clone } from '../util'
 import Animation from '../Animation'
 import { EasingFnType } from '../Easing'
 import Group from './Group'
 import Stage from '../Stage'
+import Eventful from '../Eventful'
+import Path from '../Path'
+import BoundingRect from '../BoundingRect'
+import { XrEvent } from '../domHandler'
+import { contain, containStroke } from '../contain'
 /**
  * 目前什么都没有
  */
@@ -25,6 +30,10 @@ export interface XElementStyle {
   stroke?: Color
   opacity?: number
   lineWidth?: number
+  /**
+   * 鼠标样式
+   */
+  cursor?: string
 }
 /**
  * 元素选项接口
@@ -62,6 +71,10 @@ export interface XElementOptions extends Transform {
    * 是否需要逐帧绘制
    */
   renderByFrame?: boolean
+  /**
+   * 是否开启可拖曳
+   */
+  dragable?: boolean
 }
 /**
  * 将指定样式绑定到上下文中
@@ -81,7 +94,7 @@ function bindStyle (ctx: CanvasRenderingContext2D, style: XElementStyle) {
     ctx.lineWidth = style.lineWidth
   }
 }
-interface Transform {
+export interface Transform {
   /**
    * 位置，即偏移
    */
@@ -100,10 +113,31 @@ interface Transform {
   origin?: [number, number]
 }
 
-class XElement implements Transform {
+class XElement implements Transform, Eventful {
+  _handlers: { [prop: string]: Function[]; }
+  on(event: string, handler: (e: XrEvent) => void): void {
+    throw new Error("Method not implemented.")
+  }
+  off(event?: string, handler?: Function): void {
+    throw new Error("Method not implemented.")
+  }
+  dispatch(event: string, params: any): void {
+    Eventful.prototype.dispatch.call(this, event, params)
+    if (this.parent && (this.parent.parent || this.parent._xr)) {
+      this.parent.dispatch(event, params)
+    } else {
+      this._xr.dispatch(event, params)
+    }
+  }
   name = 'xelement'
   shape: XElementShape = {}
-  style: XElementStyle = {}
+  style: XElementStyle = {
+    fill: 'none',
+    stroke: 'none',
+    lineWidth: 1,
+    opacity: 1,
+    cursor: 'pointer'
+  }
   zLevel = 1
   options: XElementOptions
   _xr: XRender
@@ -124,6 +158,14 @@ class XElement implements Transform {
   _dirty = true
   stage: Stage
   /**
+   * 路径代理
+   */
+  path: Path
+  /**
+   * 鼠标是否悬浮在元素上
+   */
+  hover: boolean
+  /**
    * 到后面会发现，对不同的属性，需要有不同的设置方法
   */
   attrFunctions = {
@@ -143,14 +185,26 @@ class XElement implements Transform {
    */
   selfNeedTransform = false
   renderByFrame = false
+
+  _rect: BoundingRect
+  /**
+   * 是否开启可拖曳
+   */
+  dragable = false
   constructor (opt: XElementOptions = {}) {
+    extendsClass(this, Eventful)
+    this.path = new Path()
     this.options = opt
+    this.initEventHandler()
   }
   /**
    * 这一步不在构造函数内进行是因为放在构造函数内的话，会被子类的默认属性声明重写
    */
-  updateOptions () {
-    let opt = this.options
+  updateOptions (opt?: XElementOptions) {
+    if (!opt) {
+      this.updateOptionsFromParent()
+      opt = this.options
+    }
     if (opt.shape) {
       merge(this.shape, opt.shape)
     } else {
@@ -161,11 +215,11 @@ class XElement implements Transform {
     } else {
       opt.style = {}
     }
-    ['origin', 'scale', 'position', 'rotation'].forEach(key => {
+    ['origin', 'scale', 'position', 'rotation', 'dragable'].forEach(key => {
       if (opt[key] !== undefined) {
         this[key] = opt[key]
+        this.selfNeedTransform = true
       }
-      this.selfNeedTransform = true
     });
     ['zLevel', 'relativeGroup', 'zIndex', 'renderByFrame'].forEach(key => {
       if (opt[key] !== undefined) {
@@ -174,9 +228,32 @@ class XElement implements Transform {
     })
   }
   /**
+   * 合并自身和父元素的配置
+   */
+  getOptions () {
+    let opt = clone(this.options);
+    // 不包括变换相关的属性
+    ['position','scale', 'origin', 'rotation', 'dragable'].forEach(key => {
+      delete opt[key]
+    })
+    if (!this.parent) {
+      return opt
+    }
+    return merge(opt, this.parent.getOptions())
+  }
+  /**
+   * 先从父元素更新配置
+   */
+  updateOptionsFromParent () {
+    if (!this.parent) {
+      return
+    }
+    this.updateOptions(this.parent.getOptions())
+  }
+  /**
    * 绘制
    */
-  render (ctx: CanvasRenderingContext2D) {
+  render (ctx: CanvasRenderingContext2D | Path) {
 
   }
   /**
@@ -189,12 +266,37 @@ class XElement implements Transform {
     this.setTransform(ctx)
     ctx.beginPath()
   }
+  hasStroke () {
+    if (this.style.stroke === 'none') {
+      return false
+    }
+    // 认为图片没有描边
+    if (this.style.stroke && this.style.lineWidth > 0 && this.name !== 'image') {
+      return true
+    }
+
+    return false
+  }
+  hasFill () {
+    if (this.style.fill === 'none') {
+      return false
+    }
+    if (this.style.fill) {
+      return true
+    }
+
+    return false
+  }
   /**
    * 绘制之后进行还原
    */
   afterRender (ctx: CanvasRenderingContext2D) {
-    ctx.stroke()
-    ctx.fill()
+    if (this.hasFill()) {
+      ctx.fill()
+    }
+    if (this.hasStroke()) {
+      ctx.stroke()
+    }
     ctx.restore()
     this.handleParentAfterRender(ctx)
   }
@@ -203,7 +305,8 @@ class XElement implements Transform {
    */
   refresh (ctx: CanvasRenderingContext2D) {
     this.beforeRender(ctx)
-    this.render(ctx)
+    this.path.start(ctx)
+    this.render(this.path)
     this.afterRender(ctx)
   }
   /**
@@ -295,7 +398,6 @@ class XElement implements Transform {
       animteTarget[prop] = this[prop]
     })
     this.animation = new Animation(animteTarget)
-
     return this.animation
       .during((target) => {
         this.attr(target)
@@ -313,6 +415,8 @@ class XElement implements Transform {
     if (!this.selfNeedTransform) {
       return
     }
+    // 平移
+    ctx.translate(this.position[0], this.position[1])
     // 首先变换中心点
     ctx.translate(this.origin[0], this.origin[1])
     // 应用缩放
@@ -320,9 +424,7 @@ class XElement implements Transform {
     // 应用旋转
     ctx.rotate(this.rotation)
     // 恢复
-    ctx.translate(-this.origin[0], -this.origin[1])
-    // 平移
-    ctx.translate(this.position[0], this.position[1])
+    ctx.translate(-this.origin[0] / this.scale[0], -this.origin[1] / this.scale[1])
   }
   /**
    * 设置相对元素的变换
@@ -349,6 +451,8 @@ class XElement implements Transform {
     this.relativeGroup = parent
     parent.stage.add(this)
     this.setXr(parent._xr)
+    // 更新配置
+    this.updateOptions()
   }
   /**
    * 在渲染之前对父元素进行处理
@@ -373,10 +477,145 @@ class XElement implements Transform {
    * 在使用完毕后会标记为false
    */
   dirty () {
+    this._rect = null
     // 并不需要对父元素也进行标记
     this._dirty = true
     this._xr && this._xr.render()
   }
+  /**
+   * 是否包含某个点
+   */
+  contain (x: number, y: number) {
+    let local = this.getLocalCord(x, y)
+    x = local[0]
+    y = local[1]
+
+    if (this.getBoundingRect().contain(x, y)) {
+      if (this.hasStroke()) {
+        if (containStroke(this.path.data, this.style.lineWidth, x, y)) {
+          return true
+        }
+      }
+      if (this.hasFill()) {
+        return contain(this.path.data, x, y)
+      }
+    }
+  }
+  getBoundingRect () {
+    // 第一次和需要更新时才重新获取包围盒
+    // 为此需要在更新时将_rect置为null
+    // 尽管不是所有属性更新都会引起包围盒变化，暂时先不管
+    if (!this._rect) {
+      this._rect = this.path.getBoundingRect()
+      let rect = this._rect
+      let lineWidth = this.style.lineWidth
+      if (this.hasStroke()) {
+        // 因为描边是两边都描
+        rect.x -= lineWidth / 2
+        rect.y -= lineWidth / 2
+        rect.width += lineWidth
+        rect.height += lineWidth
+      }
+    }
+    return this._rect
+  }
+  /**
+   * 将坐标重置为本地坐标
+   */
+  getLocalCord (x: number, y: number) {
+    // 计算的时候取相对定位的组，而不是父元素
+    if (this.relativeGroup) {
+      let inParentCord = this.relativeGroup.getLocalCord(x, y)
+      x = inParentCord[0]
+      y = inParentCord[1]
+    }
+    if (this.selfNeedTransform) {
+      let transformCord = getTransformCord(x, y, {
+        scale: this.scale,
+        origin: this.origin,
+        position: this.position,
+        rotation: this.rotation
+      })
+      x = transformCord[0]
+      y = transformCord[1]
+    }
+
+
+    return [x, y]
+    
+  }
+  initEventHandler () {
+    this.initDragEvent()
+  }
+  initDragEvent () {
+    let lastX = 0
+    let lastY = 0
+    let draging = false
+    if (this)
+    this.on('mousedown', e => {
+      if (!this.dragable || (this !== e.target)) {
+        return
+      }
+      draging = true
+      lastX = e.x
+      lastY = e.y
+      this._xr.setCursor('move')
+    })
+    this.on('mousemove', e => {
+      if (!draging || !this.dragable || (this !== e.target)) {
+        return
+      }
+      let xDiff = e.x - lastX
+      let yDiff = e.y - lastY
+      let xel = e.target
+      xel.attr({
+        position: [xel.position[0] += xDiff, xel.position[1] += yDiff]
+      })
+      lastX = e.x
+      lastY = e.y
+    })
+    this.on('mouseup', e => {
+      if (!this.dragable  || (this !== e.target)) {
+        return
+      }
+      draging = false
+      this._xr.setCursor(this.style.cursor)
+    })
+    this.on('mouseleave', e => {
+      if (!this.dragable  || (this !== e.target)) {
+        return
+      }
+      this._xr.setCursor('default')
+      draging = false
+    })
+  }
+}
+inherit(XElement, Eventful, ['dispatch'])
+
+export function getTransformCord(x, y, transform: Transform) {
+  // 所有距离都要乘以缩放系数
+  let scaleX = transform.scale[0]
+  let scaleY = transform.scale[1]
+  // 平移
+  x -= transform.position[0]
+  y -= transform.position[1]
+  
+  // 得出它绕中心点旋转相反角度后的坐标
+  // 证明过程参考前文
+  let sinRotation = Math.sin(-transform.rotation)
+  let cosRotation = Math.cos(-transform.rotation)
+  let x2ox = x - transform.origin[0]
+  let y2oy = y - transform.origin[1]
+  x = x2ox * cosRotation - y2oy * sinRotation + transform.origin[0]
+  y = x2ox * sinRotation + y2oy * cosRotation + transform.origin[1]
+  
+  // 缩放
+  x = x / scaleX
+  y = y / scaleY
+
+  return [x, y]
 }
 
+
 export default XElement
+      

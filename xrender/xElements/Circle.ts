@@ -19,7 +19,7 @@ interface CircleOptions extends XElementOptions {
 }
 
 class Circle extends XElement {
-  name ='circle'
+  name = 'circle'
   shape: CircleShape = {
     cx: 0,
     cy: 0,
