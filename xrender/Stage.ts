@@ -28,14 +28,32 @@ class Stage {
    * 获取所有元素
    */
   getAll () {
-    this.updateXElements()
-    return this.xelements.filter(xel => !xel.ignored)
+    let xelements = this.updateXElements()
+
+    return xelements
   }
   updateXElements () {
+    // zIndex高的在后
     // zLevel高的在后，其它按加入次序排列
-    this.xelements.sort((a, b) => {
-      return a.zLevel - b.zLevel
+    return this.expandXElements().sort((a, b) => {
+      let zIndex = a.zIndex - b.zIndex
+      return  zIndex === 0 ? a.zLevel - b.zLevel : zIndex
     })
+  }
+  /**
+   * 展开所有元素
+   */
+  expandXElements () {
+    let list: XElement[] = []
+    this.xelements.forEach(xel => {
+      if (xel.stage) {
+        list.push(...xel.stage.getAll())
+      } else if (!xel.ignored) {
+        list.push(xel)
+      }
+    })
+
+    return list
   }
 }
 

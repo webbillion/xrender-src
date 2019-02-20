@@ -15,10 +15,12 @@ class XRender {
     this.painter = new Painter(dom, stage, opt)
   }
   add (...xelements: XElement[]) {
-    xelements.forEach(xel => {
+    let xel
+    for (let i = 0; i < xelements.length; i += 1) {
+      xel = xelements[i]
       xel.setXr(this)
-    })
-    this.stage.add(...xelements)
+      this.stage.add(xel)
+    }
     this.render()
   }
   render () {

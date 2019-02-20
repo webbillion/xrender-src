@@ -1,6 +1,9 @@
 import XRender from '../XRender'
 import { isString, isObject, merge, isFunction } from '../util'
 import Animation from '../Animation'
+import { EasingFnType } from '../Easing'
+import Group from './Group'
+import Stage from '../Stage'
 /**
  * 目前什么都没有
  */
@@ -43,16 +46,36 @@ export interface XElementOptions extends Transform {
    * 元素所处层级
    */
   zLevel?: number
+  /**
+   * 相对哪个`Group`定位
+   */
+  relativeGroup?: Group
+  /**
+   * 在哪个`Group`内
+   */
+  parent?: Group
+  /**
+   * 属于哪一层
+   */
+  zIndex?: number
 }
 /**
  * 将指定样式绑定到上下文中
  */
 function bindStyle (ctx: CanvasRenderingContext2D, style: XElementStyle) {
   let fill = style.fill || 'transparent'
-  ctx.fillStyle = fill
-  ctx.strokeStyle = style.stroke
-  ctx.globalAlpha = style.opacity
-  ctx.lineWidth = style.lineWidth
+  if (style.fill !== ctx.fillStyle) {
+    ctx.fillStyle = fill
+  }
+  if (style.stroke !== ctx.strokeStyle) {
+    ctx.strokeStyle = style.stroke
+  }
+  if (style.opacity !== ctx.globalAlpha) {
+    ctx.globalAlpha = style.opacity
+  }
+  if (style.lineWidth !== ctx.lineWidth) {
+    ctx.lineWidth = style.lineWidth
+  }
 }
 interface Transform {
   /**
@@ -90,6 +113,12 @@ class XElement implements Transform {
   // 默认以左上角为变换中心，因为无法用百分比————每个图形元素的形状都不相同
   origin: [number, number] = [0, 0]
   rotation = 0
+  zIndex = 1
+  /**
+   * 元素是否为脏，如果是，重绘时会更新元素所在层，脏检查，这是常用的名词，虽然我不太懂
+   */
+  _dirty = true
+  stage: Stage
   /**
    * 到后面会发现，对不同的属性，需要有不同的设置方法
   */
@@ -103,6 +132,12 @@ class XElement implements Transform {
       merge(style, newStyle)
     }
   }
+  relativeGroup: Group
+  parent: Group
+  /**
+   * 只对设置了相关属性的图形进行`transform`
+   */
+  selfNeedTransform = false
   constructor (opt: XElementOptions = {}) {
     this.options = opt
   }
@@ -113,12 +148,22 @@ class XElement implements Transform {
     let opt = this.options
     if (opt.shape) {
       merge(this.shape, opt.shape)
+    } else {
+      opt.shape = {}
     }
     if (opt.style) {
       merge(this.style, opt.style)
+    } else {
+      opt.style = {}
     }
-    ['zLevel', 'origin', 'scale', 'position', 'rotation'].forEach(key => {
-      if (opt[key]) {
+    ['origin', 'scale', 'position', 'rotation'].forEach(key => {
+      if (opt[key] !== undefined) {
+        this[key] = opt[key]
+      }
+      this.selfNeedTransform = true
+    });
+    ['zLevel', 'relativeGroup', 'zIndex'].forEach(key => {
+      if (opt[key] !== undefined) {
         this[key] = opt[key]
       }
     })
@@ -133,6 +178,7 @@ class XElement implements Transform {
    * 绘制之前进行样式的处理
    */
   beforeRender (ctx: CanvasRenderingContext2D) {
+    this.handleParentBeforeRender(ctx)
     ctx.save()
     bindStyle(ctx, this.style)
     this.setTransform(ctx)
@@ -145,6 +191,7 @@ class XElement implements Transform {
     ctx.stroke()
     ctx.fill()
     ctx.restore()
+    this.handleParentAfterRender(ctx)
   }
   /**
    * 刷新，这个方法由外部调用
@@ -185,7 +232,7 @@ class XElement implements Transform {
       }
     }
     this.updateOptions()
-    this._xr.render()
+    this.dirty()
   }
   /**
    * 显示元素
@@ -204,7 +251,7 @@ class XElement implements Transform {
   /**
    * 动画到某个状态
    */
-  animateTo (target: Object, time: any, delay: any, easing: any, callback: any) {
+  animateTo (target: XElementOptions, time?: any, delay?: any, easing?: EasingFnType, callback?: any) {
     // 这一段复制的
     // animateTo(target, time, easing, callback)
     if (isString(delay)) {
@@ -257,17 +304,73 @@ class XElement implements Transform {
    * 设置变换
    */
   setTransform (ctx: CanvasRenderingContext2D) {
+    this.setRelativeTransform(ctx)
+    if (!this.selfNeedTransform) {
+      return
+    }
     // 首先变换中心点
-    ctx.translate(...this.origin)
+    ctx.translate(this.origin[0], this.origin[1])
     // 应用缩放
-    ctx.scale(...this.scale)
+    ctx.scale(this.scale[0], this.scale[1])
     // 应用旋转
     ctx.rotate(this.rotation)
     // 恢复
     ctx.translate(-this.origin[0], -this.origin[1])
     // 平移
-    ctx.translate(...this.position)
-    
+    ctx.translate(this.position[0], this.position[1])
+  }
+  /**
+   * 设置相对元素的变换
+   */
+  setRelativeTransform (ctx: CanvasRenderingContext2D) {
+    let parent = this.parent
+    // 如果不在一个组内，不需要做任何操作
+    while (parent) {
+      // 父元素和定位元素相同跳出循环
+      if (parent === this.relativeGroup) {
+        break
+      }
+      // 否则重置父元素
+      parent.resumeTransform(ctx)
+      parent = parent.parent
+    }
+  }
+  /**
+   * 为自身设置父元素,同时将父元素设为相对定位的元素
+   * 然后将自身加入父元素的`stage`中
+   */
+  setParent (parent: Group) {
+    this.parent = parent
+    this.relativeGroup = parent
+    parent.stage.add(this)
+    this.setXr(parent._xr)
+  }
+  /**
+   * 在渲染之前对父元素进行处理
+   * 包括应用样式等
+   */
+  handleParentBeforeRender (ctx: CanvasRenderingContext2D) {
+    if (this.parent) {
+      this.parent.beforeRender(ctx)
+    }
+  }
+  /**
+   * 渲染之后对父元素进行处理
+   * 主要是调用`restore`
+   */
+  handleParentAfterRender (ctx: CanvasRenderingContext2D) {
+    if (this.parent) {
+      this.parent.afterRender(ctx)
+    }
+  }
+  /**
+   * 标记元素为脏
+   * 在使用完毕后会标记为false
+   */
+  dirty () {
+    // 并不需要对父元素也进行标记
+    this._dirty = true
+    this._xr && this._xr.render()
   }
 }
 

@@ -15,7 +15,7 @@ interface CircleShape extends XElementShape {
   r: number
 }
 interface CircleOptions extends XElementOptions {
-  shape: CircleShape
+  shape?: CircleShape
 }
 
 class Circle extends XElement {
@@ -25,7 +25,7 @@ class Circle extends XElement {
     cy: 0,
     r: 100
   }
-  constructor (opt: CircleOptions) {
+  constructor (opt: CircleOptions = {}) {
     super(opt)
     this.updateOptions()
   }

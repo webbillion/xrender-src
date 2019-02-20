@@ -1,5 +1,7 @@
 import Stage from './Stage'
+import Layer from './Layer'
 import { isString, debounce } from './util'
+import XElement from './xElements/XElement'
 
 export interface PainterOptions {
   width?: number
@@ -7,64 +9,156 @@ export interface PainterOptions {
   backgroundColor?: string
 }
 /**
- * 创建canvas
+ * 有多个层级时创建一个容器，让canvas相对于它定位
  */
-function createCanvas (dom: string | HTMLCanvasElement | HTMLElement) {
-  if (isString(dom)) {
-    dom = document.querySelector(dom as string) as HTMLElement
-  }
-  if (dom instanceof HTMLCanvasElement) {
-    return dom
-  }
-  let canvas = document.createElement('canvas');
-  (<HTMLElement>dom).appendChild(canvas)
+function createRoot (width: number, height: number) {
+  let root = document.createElement('div')
+  root.style.cssText = `
+    position: relative;
+    overflow: hidden;
+    width: ${width}px;
+    height: ${height}px;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+  `
 
-  canvas.height = (<HTMLElement>dom).clientHeight
-  canvas.width = (<HTMLElement>dom).clientWidth
-
-  return canvas
-}
-/**
- * 后续还有更多的样式需要设置
- */
-function setCanvasStyle (canvas: HTMLCanvasElement, opt: PainterOptions) {
-  if (opt.height) {
-    canvas.height = opt.height
-    canvas.style.height = `${opt.height}px`
-  } else {
-    opt.height = canvas.clientHeight
-  }
-  if (opt.width) {
-    canvas.width = opt.width
-    canvas.style.width = `${opt.width}px`
-  } else {
-    opt.width = canvas.clientWidth
-  }
-  if (opt.backgroundColor) {
-    canvas.style.backgroundColor = opt.backgroundColor
-  }
+  return root
 }
 class Painter {
-  canvas: HTMLCanvasElement
+  root: HTMLElement
+  layerContainer: HTMLElement
   stage: Stage
-  ctx: CanvasRenderingContext2D
   opt: PainterOptions
+  /**
+   * 带层索引的对象
+   */
+  layerListMap: { [prop: string]: Layer } = {}
+  /**
+   * 正在绘制的id，调用`paintList`时，如果传入的id和最新的id不一样，则直接返回
+   * 把元素留到下一帧绘制时，中途render被调用，则取消原来的绘制，重新绘制
+   */
+  drawId: number
   render = debounce(() => {
     this.beforeRender()
     let xelements = this.stage.getAll()
-    for (let i = 0; i < xelements.length; i += 1) {
-      xelements[i].refresh(this.ctx)
-    }
+    this.updateLayerList(xelements)
+    this.drawId = Math.random()
+    this.painList(xelements, this.drawId)
   }, 10)
-  constructor (dom: string | HTMLCanvasElement | HTMLElement, stage: Stage, opt: PainterOptions = {}) {
+  constructor (dom: string | HTMLElement, stage: Stage, opt: PainterOptions = {}) {
     this.opt = opt
-    this.canvas = createCanvas(dom)
-    setCanvasStyle(this.canvas, opt)
     this.stage = stage
-    this.ctx = this.canvas.getContext('2d')
+    let width = 0
+    let height = 0
+    if (isString(dom)) {
+      dom = document.querySelector(dom as string) as HTMLElement
+    }
+    width = (<HTMLElement>dom).clientWidth
+    height = (<HTMLElement>dom).clientHeight
+    if (!opt.width) {
+      opt.width = width
+    }
+    if (!opt.height) {
+      opt.height = height
+    }
+    this.root = dom as HTMLElement
+    let container = createRoot(opt.width, opt.height)
+    this.layerContainer = container
+    this.root.appendChild(container)
+    /**
+     * 默认的层
+     */
+    let mainLayer = new Layer(container, opt)
+    this.layerListMap[1] = mainLayer
   }
   beforeRender () {
-    this.ctx.clearRect(0, 0, this.opt.width, this.opt.height)
+  }
+  /**
+   * 更新层
+   */
+  updateLayerList (xelList: XElement[]) {
+    let preLayer = null
+    let layerList = this.layerListMap
+    // 开始之前重置
+    this.eachLayer((layer) => {
+      layer.startIndex = -1
+      layer.endIndex = -1
+      layer.drawIndex = -1
+    })
+    for (let i = 0; i < xelList.length; i += 1) {
+      let xel = xelList[i]
+      let layer = layerList[xel.zIndex] || this.createLayer(xel.zIndex)
+      // 到下一个层级了
+      if (preLayer !== layer) {
+        layer.startIndex = i
+      }
+      // 在这里进行标记
+      if (xel._dirty) {
+        layer._dirty = true
+      }
+      layer.endIndex = i
+      preLayer = layer
+    }
+    // 结束之后还有没有元素关联的层，销毁
+    this.eachLayer((layer, zIndex) => {
+      if (layer.startIndex === -1) {
+        layer.dispose()
+        delete layerList[zIndex]
+      }
+    })
+  }
+  /**
+   * 创建新的层并加入列表中 
+   */
+  createLayer (zIndex: number) {
+    let layer = new Layer(this.layerContainer, this.opt, zIndex)
+    this.layerListMap[zIndex] = layer
+
+    return layer
+  }
+  /**
+   * 提供一个遍历层的方法
+   */
+  eachLayer (fn: (layer: Layer, zIndex: string) => void | boolean) {
+    for (let key in this.layerListMap) {
+      // 返回为true则跳出此次遍历
+      if (fn(this.layerListMap[key], key) as boolean) {
+        break
+      }
+    }
+  }
+  painList (xelements: XElement[], drawId: number) {
+    /**
+     * 是否一帧一帧地绘制
+     */
+    let userTimer = false
+    if (drawId !== this.drawId) {
+      return
+    }
+    this.eachLayer(layer => {
+      if (!layer._dirty) {
+        return
+      }
+      let startTime = Date.now()
+      let startIndex = layer.drawIndex > -1 ? layer.drawIndex : layer.startIndex
+      for (let i = startIndex; i <= layer.endIndex; i += 1) {
+        xelements[i].refresh(layer.ctx)
+        xelements[i]._dirty = false
+        // 多余的部分留到下一帧绘制
+        if (Date.now() - startTime > 16 && userTimer) {
+          if (startIndex === 1) {
+            console.log(i)
+          }
+          layer.drawIndex = i
+          requestAnimationFrame(() => {
+            this.painList(xelements, drawId)
+          })
+          return true
+        }
+      }
+      layer._dirty = false
+    })
   }
 }
 

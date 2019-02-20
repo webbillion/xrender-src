@@ -4,16 +4,16 @@ interface RectShape extends XElementShape {
   /**
    * 左上角x
    */
-  x: number
+  x?: number
   /**
    * 左上角y
    */
-  y: number
-  width: number
-  height: number
+  y?: number
+  width?: number
+  height?: number
 }
 interface RectOptions extends XElementOptions {
-  shape: RectShape
+  shape?: RectShape
 }
 
 class Rect extends XElement {
@@ -24,7 +24,7 @@ class Rect extends XElement {
     width: 0,
     height: 0
   }
-  constructor (opt: RectOptions) {
+  constructor (opt: RectOptions = {}) {
     super(opt)
     this.updateOptions()
   }
