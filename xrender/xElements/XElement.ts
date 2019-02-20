@@ -1,5 +1,6 @@
 import XRender from '../XRender'
-import { isString, isObject, merge } from '../util'
+import { isString, isObject, merge, isFunction } from '../util'
+import Animation from '../Animation'
 /**
  * 目前什么都没有
  */
@@ -65,6 +66,7 @@ class XElement {
    * 为真的话绘制时会忽略此元素
    */
   ignored: boolean
+  animation: Animation
   /**
    * 到后面会发现，对不同的属性，需要有不同的设置方法
   */
@@ -95,6 +97,11 @@ class XElement {
     if (opt.zLevel) {
       this.zLevel = opt.zLevel
     }
+    // TODO: 要不要拷贝这个对象呢
+    this.animation = new Animation({
+      shape: this.shape,
+      style: this.style
+    })
   }
   /**
    * 绘制
@@ -172,6 +179,47 @@ class XElement {
   hide () {
     this.ignored = true
     this._xr.render()
+  }
+  /**
+   * 动画到某个状态
+   */
+  animateTo (target: Object, time: any, delay: any, easing: any, callback: any) {
+    // 这一段复制的
+    // animateTo(target, time, easing, callback)
+    if (isString(delay)) {
+      callback = easing
+      easing = delay
+      delay = 0
+    // animateTo(target, time, delay, callback)
+    } else if (isFunction(easing)) {
+      callback = easing
+      easing = 'linear'
+      delay = 0
+    // animateTo(target, time, callback)
+    } else if (isFunction(delay)) {
+      callback = delay
+      delay = 0
+    // animateTo(target, callback)
+    } else if (isFunction(time)) {
+      callback = time
+      time = 500
+    // animateTo(target)
+    } else if (!time) {
+      time = 500
+    }
+    // 先停止动画
+    this.animation.stop()
+    // 清除动画队列，查看源码了解详情
+    this.animation.clear()
+
+    return this.animation
+      .during((target) => {
+        this.attr(target)
+      })
+      .when(time, target)
+      .done(callback)
+      .delay(delay)
+      .start(easing)
   }
 }
 

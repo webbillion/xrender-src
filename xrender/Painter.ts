@@ -55,7 +55,7 @@ class Painter {
     for (let i = 0; i < xelements.length; i += 1) {
       xelements[i].refresh(this.ctx)
     }
-  }, 16)
+  }, 10)
   constructor (dom: string | HTMLCanvasElement | HTMLElement, stage: Stage, opt: PainterOptions = {}) {
     this.opt = opt
     this.canvas = createCanvas(dom)
