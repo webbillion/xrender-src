@@ -36,6 +36,12 @@ function getNestedValue (
     for (let key in nextValue) {
       value[key] = getNestedValue(preValue[key], nextValue[key], currentTime, duringTime, easingFn)
     }
+  // 数组类型
+  } else if (Array.isArray(nextValue)) {
+    value = []
+    for (let i = 0; i < nextValue.length; i += 1) {
+      value[i] = getNestedValue(preValue[i], nextValue[i], currentTime, duringTime, easingFn)
+    }
   } else {
     value = easingFn(
       currentTime,

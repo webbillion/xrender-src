@@ -26,7 +26,7 @@ export interface XElementStyle {
 /**
  * 元素选项接口
  */
-export interface XElementOptions {
+export interface XElementOptions extends Transform {
   /**
    * 元素类型
    */
@@ -54,8 +54,26 @@ function bindStyle (ctx: CanvasRenderingContext2D, style: XElementStyle) {
   ctx.globalAlpha = style.opacity
   ctx.lineWidth = style.lineWidth
 }
+interface Transform {
+  /**
+   * 位置，即偏移
+   */
+  position?: [number, number]
+  /**
+   * 缩放
+   */
+  scale?: [number, number]
+  /**
+   * 旋转
+   */
+  rotation?: number
+  /**
+   * 变换中心
+   */
+  origin?: [number, number]
+}
 
-class XElement {
+class XElement implements Transform {
   name = 'xelement'
   shape: XElementShape = {}
   style: XElementStyle = {}
@@ -67,6 +85,11 @@ class XElement {
    */
   ignored: boolean
   animation: Animation
+  position: [number, number] = [0, 0]
+  scale: [number, number] = [1, 1]
+  // 默认以左上角为变换中心，因为无法用百分比————每个图形元素的形状都不相同
+  origin: [number, number] = [0, 0]
+  rotation = 0
   /**
    * 到后面会发现，对不同的属性，需要有不同的设置方法
   */
@@ -94,13 +117,10 @@ class XElement {
     if (opt.style) {
       merge(this.style, opt.style)
     }
-    if (opt.zLevel) {
-      this.zLevel = opt.zLevel
-    }
-    // TODO: 要不要拷贝这个对象呢
-    this.animation = new Animation({
-      shape: this.shape,
-      style: this.style
+    ['zLevel', 'origin', 'scale', 'position', 'rotation'].forEach(key => {
+      if (opt[key]) {
+        this[key] = opt[key]
+      }
     })
   }
   /**
@@ -115,6 +135,7 @@ class XElement {
   beforeRender (ctx: CanvasRenderingContext2D) {
     ctx.save()
     bindStyle(ctx, this.style)
+    this.setTransform(ctx)
     ctx.beginPath()
   }
   /**
@@ -208,9 +229,20 @@ class XElement {
       time = 500
     }
     // 先停止动画
-    this.animation.stop()
-    // 清除动画队列，查看源码了解详情
-    this.animation.clear()
+    this.animation && this.animation.stop()
+    let animateProps = [
+      'shape',
+      'style',
+      'position',
+      'scale',
+      'origin',
+      'rotation'
+    ]
+    let animteTarget = {}
+    animateProps.forEach(prop => {
+      animteTarget[prop] = this[prop]
+    })
+    this.animation = new Animation(animteTarget)
 
     return this.animation
       .during((target) => {
@@ -220,6 +252,22 @@ class XElement {
       .done(callback)
       .delay(delay)
       .start(easing)
+  }
+  /**
+   * 设置变换
+   */
+  setTransform (ctx: CanvasRenderingContext2D) {
+    // 首先变换中心点
+    ctx.translate(...this.origin)
+    // 应用缩放
+    ctx.scale(...this.scale)
+    // 应用旋转
+    ctx.rotate(this.rotation)
+    // 恢复
+    ctx.translate(-this.origin[0], -this.origin[1])
+    // 平移
+    ctx.translate(...this.position)
+    
   }
 }
 
