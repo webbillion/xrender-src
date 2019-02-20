@@ -43,11 +43,15 @@ class Layer {
   _dirty = false
   /**
    * 层所属元素在所有元素列表中的开始和结束索引
-   * 如果遍历所有元素，结束索引认为0，则应该销毁这一层
+   * 如果遍历所有元素，结束索引仍未-1，则应该销毁这一层
    */
   startIndex = -1
   endIndex = -1
   drawIndex = -1
+  /**
+   * 是否逐帧绘制
+   */
+  renderByFrame = false
   constructor (container: HTMLElement, opt: LayerOptions = {}, zIndex = 1) {
     this.opt = opt
     let canvas = createCanvas(container, opt, zIndex)

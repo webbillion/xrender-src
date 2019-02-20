@@ -27,31 +27,41 @@ class Stage {
   /**
    * 获取所有元素
    */
-  getAll () {
-    let xelements = this.updateXElements()
+  getAll (callback?: (xel: XElement) => void) {
+    let xelements = this.updateXElements(callback)
 
     return xelements
   }
-  updateXElements () {
-    // zIndex高的在后
+  updateXElements (callback?: (xel: XElement) => void) {
+    // zIndex高的在前
     // zLevel高的在后，其它按加入次序排列
-    return this.expandXElements().sort((a, b) => {
-      let zIndex = a.zIndex - b.zIndex
+    return this.expandXElements(callback).sort((a, b) => {
+      let zIndex = b.zIndex - a.zIndex
       return  zIndex === 0 ? a.zLevel - b.zLevel : zIndex
     })
   }
   /**
    * 展开所有元素
+   * 有一个副作用，目前用来设置xr
    */
-  expandXElements () {
+  expandXElements (callback?: (xel: XElement) => void) {
     let list: XElement[] = []
-    this.xelements.forEach(xel => {
+    let xElements = this.xelements
+    for (let childIndex = 0; childIndex < xElements.length; childIndex += 1) {
+      let xel = xElements[childIndex]
       if (xel.stage) {
-        list.push(...xel.stage.getAll())
-      } else if (!xel.ignored) {
-        list.push(xel)
+        // 已经经过筛选了
+        let children = xel.stage.getAll(callback)
+        for (let i = 0, j = list.length; i < children.length; i += 1, j += 1) {
+          list[j] = children[i]
+        }
+      } else {
+        callback && callback(xel)
+        if (!xel.ignored) {
+          list.push(xel)
+        } 
       }
-    })
+    }
 
     return list
   }

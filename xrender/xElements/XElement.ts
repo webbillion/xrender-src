@@ -58,6 +58,10 @@ export interface XElementOptions extends Transform {
    * 属于哪一层
    */
   zIndex?: number
+  /**
+   * 是否需要逐帧绘制
+   */
+  renderByFrame?: boolean
 }
 /**
  * 将指定样式绑定到上下文中
@@ -138,6 +142,7 @@ class XElement implements Transform {
    * 只对设置了相关属性的图形进行`transform`
    */
   selfNeedTransform = false
+  renderByFrame = false
   constructor (opt: XElementOptions = {}) {
     this.options = opt
   }
@@ -162,7 +167,7 @@ class XElement implements Transform {
       }
       this.selfNeedTransform = true
     });
-    ['zLevel', 'relativeGroup', 'zIndex'].forEach(key => {
+    ['zLevel', 'relativeGroup', 'zIndex', 'renderByFrame'].forEach(key => {
       if (opt[key] !== undefined) {
         this[key] = opt[key]
       }

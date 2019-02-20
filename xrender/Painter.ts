@@ -85,6 +85,7 @@ class Painter {
       layer.startIndex = -1
       layer.endIndex = -1
       layer.drawIndex = -1
+      layer.renderByFrame = false
     })
     for (let i = 0; i < xelList.length; i += 1) {
       let xel = xelList[i]
@@ -97,12 +98,15 @@ class Painter {
       if (xel._dirty) {
         layer._dirty = true
       }
+      if (xel.renderByFrame) {
+        layer.renderByFrame = true
+      }
       layer.endIndex = i
       preLayer = layer
     }
     // 结束之后还有没有元素关联的层，销毁
     this.eachLayer((layer, zIndex) => {
-      if (layer.startIndex === -1) {
+      if (layer.startIndex === -1 && (parseInt(zIndex, 10) !== 1)) {
         layer.dispose()
         delete layerList[zIndex]
       }
@@ -121,7 +125,10 @@ class Painter {
    * 提供一个遍历层的方法
    */
   eachLayer (fn: (layer: Layer, zIndex: string) => void | boolean) {
-    for (let key in this.layerListMap) {
+    // 从高到低
+    let keys = Object.keys(this.layerListMap).sort((a, b) => Number(b) - Number(a))
+    for (let i in keys) {
+      let key = keys[i]
       // 返回为true则跳出此次遍历
       if (fn(this.layerListMap[key], key) as boolean) {
         break
@@ -129,27 +136,30 @@ class Painter {
     }
   }
   painList (xelements: XElement[], drawId: number) {
-    /**
-     * 是否一帧一帧地绘制
-     */
-    let userTimer = false
     if (drawId !== this.drawId) {
       return
     }
-    this.eachLayer(layer => {
-      if (!layer._dirty) {
+    this.eachLayer((layer, zIndex) => {
+      if (!layer._dirty && parseInt(zIndex, 10) !== 1) {
         return
       }
+      /**
+       * 是否逐帧绘制
+       */
+      let userTimer = layer.renderByFrame
       let startTime = Date.now()
       let startIndex = layer.drawIndex > -1 ? layer.drawIndex : layer.startIndex
+      if (layer.drawIndex === -1) {
+        layer.clear()
+      }
+      if (startIndex === -1) {
+        return
+      }
       for (let i = startIndex; i <= layer.endIndex; i += 1) {
         xelements[i].refresh(layer.ctx)
         xelements[i]._dirty = false
         // 多余的部分留到下一帧绘制
         if (Date.now() - startTime > 16 && userTimer) {
-          if (startIndex === 1) {
-            console.log(i)
-          }
           layer.drawIndex = i
           requestAnimationFrame(() => {
             this.painList(xelements, drawId)

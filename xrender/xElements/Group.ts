@@ -46,7 +46,7 @@ class Group extends XElement {
    */
   setXr (xr: XRender) {
     super.setXr(xr)
-    this.stage.getAll().forEach(xel => {
+    this.stage.getAll((xel) => {
       xel.setXr(xr)
     })
   }
