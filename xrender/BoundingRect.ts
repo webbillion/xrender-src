@@ -9,6 +9,15 @@ class BoundingRect {
   width = 0
   height = 0
   constructor (x: number, y: number, width: number, height: number) {
+    // 宽高可以为负数
+    if (width < 0) {
+      x += width
+      width = -width
+    }
+    if (height < 0) {
+      y += height
+      height = -height
+    }
     this.x = x
     this.y = y
     this.width = width
@@ -29,6 +38,14 @@ class BoundingRect {
    * 同时，直接修改当前包围盒，而不是新建一个
    */
   union (rect: {x : number, y: number, width: number, height: number}) {
+    if (rect.width < 0) {
+      rect.x += rect.width
+      rect.width = -rect.width
+    }
+    if (rect.height < 0) {
+      rect.y += rect.height
+      rect.height = -rect.height
+    }
     //  对于初始宽高为0的情况直接设置
     if (this.width <= 0 || this.height <= 0) {
       this.x = rect.x

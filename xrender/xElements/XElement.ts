@@ -486,6 +486,10 @@ class XElement implements Transform, Eventful {
    * 是否包含某个点
    */
   contain (x: number, y: number) {
+    // 触发事件时可能还没有调用refresh
+    if (!this.path._ctx) {
+      return
+    }
     let local = this.getLocalCord(x, y)
     x = local[0]
     y = local[1]
