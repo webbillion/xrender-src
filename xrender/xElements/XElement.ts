@@ -376,6 +376,9 @@ class XElement implements Transform, Eventful {
    * 刷新，这个方法由外部调用
    */
   refresh (ctx: CanvasRenderingContext2D) {
+    if (this.ignored) {
+      return
+    }
     this.beforeRender(ctx)
     this.path.start(ctx)
     this.render(this.path)
@@ -419,14 +422,15 @@ class XElement implements Transform, Eventful {
    */
   show () {
     this.ignored = false
-    this._xr.render()
+    this.dirty()
   }
   /**
    * 隐藏元素
    */
   hide () {
     this.ignored = true
-    this._xr.render()
+    // 因此同样适用于隐藏Group
+    this.dirty()
   }
   /**
    * 动画到某个状态

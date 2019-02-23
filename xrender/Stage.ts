@@ -76,9 +76,7 @@ class Stage {
         }
       } else {
         callback && callback(xel)
-        if (!xel.ignored) {
-          list.push(xel)
-        } 
+        list.push(xel)
       }
     }
 

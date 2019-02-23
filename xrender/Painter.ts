@@ -114,13 +114,7 @@ class Painter {
       layer.endIndex = i
       preLayer = layer
     }
-    // 结束之后还有没有元素关联的层，销毁
-    this.eachLayer((layer, zIndex) => {
-      if (layer.startIndex === -1 && (parseInt(zIndex, 10) !== 1)) {
-        layer.dispose()
-        delete layerList[zIndex]
-      }
-    })
+    // 因为delete的修正，不用担心层没有关联元素时会触发不了更新
   }
   /**
    * 创建新的层并加入列表中 
@@ -152,8 +146,8 @@ class Painter {
     if (drawId !== this.drawId) {
       return
     }
-    this.eachLayer((layer, zIndex) => {
-      if (!layer._dirty && parseInt(zIndex, 10) !== 1) {
+    this.eachLayer(layer=> {
+      if (!layer._dirty) {
         return
       }
       /**
