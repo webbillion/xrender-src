@@ -129,6 +129,9 @@ export default function createDomHandler (dom: HTMLElement, stage: Stage) {
       // 如`mouseleave`事件，虽然鼠标离开的坐标不在元素内，但元素仍然需要触发事件
       for (; i >= 0; i -= 1) {
         xel = xelements[i]
+        if (xel.ignored) {
+          continue
+        }
         let isContain = xel.contain(xrEvent.x, xrEvent.y)
         if (isContain) {
           // 对于剩下的元素，可以直接设置hover为false来重置，不必再判断
