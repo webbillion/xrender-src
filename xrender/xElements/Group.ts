@@ -110,6 +110,9 @@ class Group extends XElement {
     let child: XElement
     for (let i = 0; i < children.length; i += 1) {
       child = children[i]
+      if (child.ignored) {
+        continue
+      }
       rect.union(child.getBoundingRect().applyTransform(child))
     }
     this._rect = rect

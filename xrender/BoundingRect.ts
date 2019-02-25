@@ -46,6 +46,9 @@ class BoundingRect {
       rect.y += rect.height
       rect.height = -rect.height
     }
+    if (rect.width <= 0 || rect.height <= 0) {
+      return
+    }
     //  对于初始宽高为0的情况直接设置
     if (this.width <= 0 || this.height <= 0) {
       this.x = rect.x
