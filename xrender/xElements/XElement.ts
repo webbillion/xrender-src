@@ -7,7 +7,7 @@ import Stage from '../Stage'
 import Eventful from '../Eventful'
 import Path from '../Path'
 import BoundingRect from '../BoundingRect'
-import { XrEvent } from '../domHandler'
+import { XrEvent, XrEventType } from '../domHandler'
 import { contain, containStroke } from '../contain'
 /**
  * 目前什么都没有
@@ -113,15 +113,15 @@ export interface Transform {
   origin?: [number, number]
 }
 
-class XElement implements Transform, Eventful {
-  _handlers: { [prop: string]: Function[]; }
-  on(event: string, handler: (e: XrEvent) => void): void {
-    throw new Error("Method not implemented.")
+class XElement implements Transform, Eventful<XrEventType, XrEvent> {
+  _handlers: { [prop: string]: ((e?: XrEvent) => void)[]; };
+  on(event: XrEventType, handler: (e?: XrEvent) => void): void {
+    throw new Error("Method not implemented.");
   }
-  off(event?: string, handler?: Function): void {
-    throw new Error("Method not implemented.")
+  off(event?: XrEventType, handler?: (e?: XrEvent) => void): void {
+    throw new Error("Method not implemented.");
   }
-  dispatch(event: string, params: any): void {
+  dispatch(event: XrEventType, params?: XrEvent): void {
     Eventful.prototype.dispatch.call(this, event, params)
     if (this.parent && (this.parent.parent || this.parent._xr)) {
       this.parent.dispatch(event, params)

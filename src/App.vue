@@ -11,7 +11,7 @@ import * as xrender from '../xrender'
 
 @Component({
   mounted () {
-    let xr = xrender.init('#canvas', {
+    let xr = xrender.init('#app', {
       height: 300,
       width: 400
     })
@@ -61,7 +61,9 @@ import * as xrender from '../xrender'
       }
     })
     xr.add(rect)
-    window.circle = circle
+    xr.on('mousedown', (e) => {
+      e.type
+    })
   }
 })
 export default class App extends Vue {}

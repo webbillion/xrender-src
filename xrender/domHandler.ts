@@ -24,14 +24,15 @@ export interface XrEvent {
   /**
    * 事件类型
    */
-  type?: string
+  type?: XrEventType
 }
+export type XrEventType = 'click' | 'mousedown' | 'mouseup' | 'mousemove' | 'mouseleave' | 'mouseenter'
 /**
  * 鼠标事件名称
  * 目前也只考虑鼠标事件
  * 大部分事件不需要做特殊处理
  */
-const mouseEvents = [
+const mouseEvents: XrEventType[] = [
   'click',
   'mousedown',
   'mouseup',
@@ -68,7 +69,7 @@ const handlers = {
 /**
  * 将事件转换为内部的事件
  */
-function normalizeEvent (e: XrEvent,  type: string, xel: XElement) {
+function normalizeEvent (e: XrEvent,  type: XrEventType, xel: XElement) {
   e.target = xel
   e.type = type
 
@@ -88,7 +89,7 @@ function convertCoordinates (e: MouseEvent, dom: HTMLElement) {
 
   return xrEvent
 }
-export class DomHandler extends Eventful {
+export class DomHandler extends Eventful<XrEventType, XrEvent> {
   domEventsHandlers: {
     [prop: string]: Function
   } = {}

@@ -3,22 +3,22 @@ import Stage from './Stage'
 import Painter, { PainterOptions } from './Painter'
 import Eventful from './Eventful'
 import { inherit, extendsClass } from './util'
-import createDomHandler, { DomHandler } from './domHandler'
+import createDomHandler, { DomHandler, XrEvent, XrEventType } from './domHandler'
 
 export interface XRenderOptions extends PainterOptions {
 
 }
 
-class XRender implements Eventful {
-  _handlers: { [prop: string]: Function[]; }
-  on(event: string, handler: Function): void {
-    throw new Error("Method not implemented.")
+class XRender implements Eventful<XrEventType, XrEvent> {
+  _handlers: { [prop: string]: ((e?: XrEvent) => void)[]; };
+  on(event: XrEventType, handler: (e?: XrEvent) => void): void {
+    throw new Error("Method not implemented.");
   }
-  off(event?: string, handler?: Function): void {
-    throw new Error("Method not implemented.")
+  off(event?: XrEventType, handler?: (e?: XrEvent) => void): void {
+    throw new Error("Method not implemented.");
   }
-  dispatch(event: string, params?: any): void {
-    throw new Error("Method not implemented.")
+  dispatch(event: XrEventType, params?: XrEvent): void {
+    throw new Error("Method not implemented.");
   }
   stage: Stage
   painter: Painter
@@ -50,8 +50,8 @@ class XRender implements Eventful {
     const domHandler = this.domHandler = createDomHandler(this.painter.layerContainer, this.stage)
     let domEventHandlers = this.domHandler.domEventsHandlers
     for (let eventName in domEventHandlers) {
-      domHandler.on(eventName, e => {
-        this.dispatch(eventName, e)
+      domHandler.on(eventName as XrEventType, e => {
+        this.dispatch(eventName as XrEventType, e)
       })
     }
   }

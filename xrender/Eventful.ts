@@ -1,15 +1,21 @@
+type Handler<T> = (e?: T) => void
+
 // 不考虑`handler`不是函数的情况
-class Eventful {
+class Eventful<EventType = string, Params = any> {
   /**
    * 事件回调
    */
   _handlers: {
-    [prop: string]: Function[]
+    [prop: string]: Handler<Params>[]
   } = {}
   /**
    * 监听事件
    */
-  on (event: string, handler: Function) {
+  on (event: EventType, handler: Handler<Params>) {
+    // 绕过类型检查
+    if (typeof event !== 'string') {
+      return
+    }
     let handlers = this._handlers
     if (!handlers[event]) {
       handlers[event] = [handler]
@@ -24,7 +30,11 @@ class Eventful {
   /**
    * 取消监听
    */
-  off (event?: string, handler?: Function) {
+  off (event?: EventType, handler?: Handler<Params>) {
+    // 绕过类型检查
+    if (typeof event !== 'string') {
+      return
+    }
     if (!event) {
       this._handlers = {}
       return
@@ -45,7 +55,11 @@ class Eventful {
   /**
    * 触发回调
    */
-  dispatch (event: string, params?: any) {
+  dispatch (event: EventType, params?: Params) {
+    // 绕过类型检查
+    if (typeof event !== 'string') {
+      return
+    }
     let handlers = this._handlers[event]
     if (!handlers) {
       return
