@@ -24,14 +24,15 @@ export interface XrEvent {
   /**
    * 事件类型
    */
-  type?: string
+  type?: XrEventType
 }
+export type XrEventType = 'click' | 'mousedown' | 'mouseup' | 'mousemove' | 'mouseleave' | 'mouseenter'
 /**
  * 鼠标事件名称
  * 目前也只考虑鼠标事件
  * 大部分事件不需要做特殊处理
  */
-const mouseEvents = [
+const mouseEvents: XrEventType[] = [
   'click',
   'mousedown',
   'mouseup',
@@ -68,7 +69,7 @@ const handlers = {
 /**
  * 将事件转换为内部的事件
  */
-function normalizeEvent (e: XrEvent,  type: string, xel: XElement) {
+function normalizeEvent (e: XrEvent,  type: XrEventType, xel: XElement) {
   e.target = xel
   e.type = type
 
@@ -85,16 +86,10 @@ function convertCoordinates (e: MouseEvent, dom: HTMLElement) {
     y: e.clientY - rect.top,
     rawEvent: e
   }
-  if (xrEvent.x < 0) {
-    xrEvent.x = 0
-  }
-  if (xrEvent.y < 0) {
-    xrEvent.y = 0
-  }
 
   return xrEvent
 }
-export class DomHandler extends Eventful {
+export class DomHandler extends Eventful<XrEventType, XrEvent> {
   domEventsHandlers: {
     [prop: string]: Function
   } = {}
@@ -129,9 +124,6 @@ export default function createDomHandler (dom: HTMLElement, stage: Stage) {
       // 如`mouseleave`事件，虽然鼠标离开的坐标不在元素内，但元素仍然需要触发事件
       for (; i >= 0; i -= 1) {
         xel = xelements[i]
-        if (xel.ignored) {
-          continue
-        }
         let isContain = xel.contain(xrEvent.x, xrEvent.y)
         if (isContain) {
           // 对于剩下的元素，可以直接设置hover为false来重置，不必再判断

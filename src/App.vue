@@ -11,7 +11,7 @@ import * as xrender from '../xrender'
 
 @Component({
   mounted () {
-    let xr = xrender.init('#canvas', {
+    let xr = xrender.init('#app', {
       height: 300,
       width: 400
     })
